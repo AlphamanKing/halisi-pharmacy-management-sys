@@ -1,0 +1,81 @@
+# PharmEasy Admin System Documentation
+
+## Overview
+PharmEasy is a pharmacy management system that allows administrators to manage users, products, orders and other administrators. This documentation covers the key functionality available in the admin panel.
+
+## System Components
+
+### User Management
+- View all users
+- Search users by email
+- Edit user details
+- Delete users
+- View user order history
+
+### Product Management  
+- View all products/items
+- Add new products
+- Edit product details
+- Delete products
+- Search products by name
+- Manage product inventory
+
+### Order Management
+- View all orders
+- Search orders by ID 
+- Mark orders as complete/pending
+- Delete orders
+- View order details
+
+### Admin Management
+- View all admin users
+- Add new admin users
+- Edit admin details
+- Delete admin users
+- Search admins by email
+
+## Database Schema
+
+```plantuml
+@startuml
+entity User {
+  * user_id: int <<PK>>
+  --
+  * user_fname: varchar
+  * user_lname: varchar  
+  * email: varchar
+  * user_address: text
+}
+
+entity Item {
+  * item_id: int <<PK>>
+  --
+  * item_title: varchar
+  * item_brand: varchar
+  * item_cat: varchar
+  * item_details: text
+  * item_tags: varchar
+  * item_image: varchar
+  * item_quantity: int
+  * item_price: decimal
+}
+
+entity Order {
+  * order_id: int <<PK>>  
+  --
+  * user_id: int <<FK>>
+  * order_status: boolean
+  * order_date: timestamp
+}
+
+entity Admin {
+  * admin_id: int <<PK>>
+  --
+  * admin_fname: varchar
+  * admin_lname: varchar
+  * admin_email: varchar
+  * admin_password: varchar
+}
+
+User ||--o{ Order
+@enduml
