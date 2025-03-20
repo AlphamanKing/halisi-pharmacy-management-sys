@@ -324,6 +324,7 @@ function get_admin($id)
     $data = query($query);
     return $data;
 }
+
 function edit_admin($id)
 {
     if (isset($_POST['admin_update'])) {
@@ -331,11 +332,43 @@ function edit_admin($id)
         $lname = trim($_POST['admin_lname']);
         $email = trim(strtolower($_POST['admin_email']));
         $password = trim($_POST['admin_password']);
-        $check = check_email_admin($email);
-        if ($check == 0) {
-            $query = "UPDATE admin SET admin_email='$email' ,admin_fname='$fname' ,admin_lname='$lname' ,admin_password='$password'  WHERE admin_id= '$id'";
-            single_query($query);
+        
+        // Add input validation
+        if (empty($fname) || empty($lname) || empty($email)) {
+            $_SESSION['message'] = "empty_err";
             get_redirect("admin.php");
+            return;
+        }
+
+        // First check if this email exists for another admin
+        $query = "SELECT admin_email FROM admin WHERE admin_email='$email' AND admin_id != '$id'";
+        $check = query($query);
+
+        if (!$check) {
+            if (!empty($password)) {
+                // Hash the new password if provided
+                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+                $query = "UPDATE admin SET 
+                         admin_email = '$email',
+                         admin_fname = '$fname',
+                         admin_lname = '$lname',
+                         admin_password = '$hashed_password'
+                         WHERE admin_id = '$id'";
+            } else {
+                // Don't update password if none provided
+                $query = "UPDATE admin SET 
+                         admin_email = '$email',
+                         admin_fname = '$fname',
+                         admin_lname = '$lname'
+                         WHERE admin_id = '$id'";
+            }
+            
+            if(single_query($query)) {
+                get_redirect("admin.php");
+            } else {
+                $_SESSION['message'] = "updateError";
+                get_redirect("admin.php");
+            }
         } else {
             $_SESSION['message'] = "emailErr";
             get_redirect("admin.php");
@@ -354,6 +387,7 @@ function check_email_admin($email)
         return 0;
     }
 }
+
 function add_admin()
 {
     if (isset($_POST['add_admin'])) {
@@ -361,10 +395,21 @@ function add_admin()
         $lname = trim($_POST['admin_lname']);
         $email = trim(strtolower($_POST['admin_email']));
         $password = trim($_POST['admin_password']);
+        
+        // Add input validation
+        if (empty($fname) || empty($lname) || empty($email) || empty($password)) {
+            $_SESSION['message'] = "empty_err";
+            get_redirect("admin.php");
+            return;
+        }
+
         $check = check_email_admin($email);
         if ($check == 0) {
+            // Hash the password before storing
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            
             $query = "INSERT INTO admin (admin_fname, admin_lname, admin_email, admin_password) 
-            VALUES ('$fname','$lname','$email','$password')";
+            VALUES ('$fname','$lname','$email','$hashed_password')";
             single_query($query);
             get_redirect("admin.php");
         } else {

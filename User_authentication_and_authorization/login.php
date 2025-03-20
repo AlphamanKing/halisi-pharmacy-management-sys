@@ -1,4 +1,8 @@
 <?php
+// Enable error reporting
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 session_start();
 
 // Include the database config file
@@ -26,52 +30,60 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
     // Validate credentials
     if (empty($username_err) && empty($password_err)) {
-        // Prepare a select statement
-        $sql = "SELECT user_id, username, password FROM users WHERE username = ?";
+        // Get user data directly using a simple query with correct column name
+        $sql = "SELECT user_id, username, password, role, email FROM users WHERE username = ? OR email = ?";
         
         if ($stmt = $conn->prepare($sql)) {
-            // Bind variables to the prepared statement as parameters
-            $stmt->bind_param("s", $param_username);
+            $stmt->bind_param("ss", $username, $username);
+            $stmt->execute();
+            $result = $stmt->get_result();
             
-            // Set parameters
-            $param_username = $username;
+            // Debug information - comment these out in production
+            echo "Attempting login with: " . htmlspecialchars($username) . "<br>";
+            echo "SQL Query: " . $sql . "<br>";
+            echo "Number of rows found: " . $result->num_rows . "<br>";
             
-            // Attempt to execute the prepared statement
-            if ($stmt->execute()) {
-                // Store result
-                $stmt->store_result();
+            // Let's see what's in the database
+            $debug_query = "SELECT email, username FROM users";
+            $debug_result = $conn->query($debug_query);
+            echo "All users in database:<br>";
+            while($row = $debug_result->fetch_assoc()) {
+                echo "Email: " . htmlspecialchars($row['email']) . 
+                     " Username: " . htmlspecialchars($row['username']) . "<br>";
+            }
+            
+            // Remove this exit() statement
+            // exit();
+            
+            if ($result->num_rows === 1) {
+                $user = $result->fetch_assoc();
                 
-                // Check if username exists, if yes then verify password
-                if ($stmt->num_rows == 1) {
-                    // Bind result variables
-                    $stmt->bind_result($user_id, $username, $hashed_password);
-                    if ($stmt->fetch()) {
-                        if (password_verify($password, $hashed_password)) {
-                            // Password is correct, so start a new session
-                            session_start();
-                            
-                            // Store data in session variables
-                            $_SESSION["loggedin"] = true;
-                            $_SESSION["user_id"] = $user_id;
-                            $_SESSION["username"] = $username;                            
-                            
-                            // Redirect user to the Dashboard
-                            header("Location: /PHARMACY/Dashboards/Pharmacist_dashboard/index.php");
-                        } else {
-                            // Display an error message if password is not valid
-                            $password_err = "The password you entered was not valid.";
-                        }
+                // Verify password
+                if (password_verify($password, $user['password'])) {
+                    // Password is correct, start a new session
+                    $_SESSION["loggedin"] = true;
+                    $_SESSION["user_id"] = $user['user_id'];  // Changed from id to user_id
+                    $_SESSION["username"] = $user['username'];
+                    $_SESSION["role"] = $user['role'];
+                    
+                    // Redirect based on role
+                    if ($user['role'] === 'pharmacist') {
+                        header("Location: /PHARMACY/Dashboards/Pharmacist_dashboard/index.php");
+                    } else {
+                        // Add other role redirects if needed
+                        header("Location: /PHARMACY/Dashboards/default_dashboard.php");
                     }
+                    exit();
                 } else {
-                    // Display an error message if username doesn't exist
-                    $username_err = "No account found with that username.";
+                    $password_err = "The password you entered was not valid.";
                 }
             } else {
-                echo "Oops! Something went wrong. Please try again later.";
+                $username_err = "No account found with that username or email.";
             }
-
-            // Close statement
+            
             $stmt->close();
+        } else {
+            echo "SQL Error: " . $conn->error;
         }
     }
     
@@ -204,18 +216,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <h1>Welcome to Halisi Pharmacy Management System</h1>
         <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
             <input type="text" name="username" id="username" placeholder="Username/Email" required>
+            <div class="error"><?php echo $username_err; ?></div>
             <div>
                 <input type="password" name="password" id="password" placeholder="Password" required>
                 <i class="fa fa-eye-slash" aria-hidden="true" onclick="togglePassword()"></i>
             </div>
+            <div class="error"><?php echo $password_err; ?></div>
             <label>
                 <input type="checkbox" name="remember"> Remember Me
             </label>
             <a style="color: #e88260;" href="#">Forgot Password?</a>
             <button type="submit" name="submit">Login</button>
             <p style="color: #ef94f5;">Don't have an account? <a href="register.php">Register here</a></p>
-            <!-- Remove PHP block -->
-            <p class="error" id="error" style="color: red; display: none;"></p> <!-- Add an error paragraph -->
         </form>
     </div>
     <script>
@@ -237,7 +249,5 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <a href="contact_page.php">Contact Us</a>
         </p>
     </footer>
-
-    <script src="js/login.js"></script>
 </body>
 </html>
